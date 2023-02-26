@@ -13,6 +13,7 @@ data class DT_type(
     val oil_M: Double,    val oil_HC: Double,
     val body_M: Double,    val body_HC: Double,    val body_oil_S: Double,    val body_air_S: Double,    val body_radiation_S: Double,    val body_ground_S: Double,    val body_sun_S: Double,    val body_grayness: Double,
     val nominal_current: Double,
+    val name: String
 ){}
 /**
  * Class with current DT temp
@@ -194,8 +195,16 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         error.oil = oil_4ord - oil_5ord;
         error.core = core_4ord - core_5ord;
         error.body = body_4ord - body_5ord;
+        println(error)
+        println(temp)
     }
+    /**
+     * Функция управления шагом расчета
+     */
+    fun update_step(var step: Double, val err: CError)
+    {
 
+    }
     /**
      * Функция расчета температу конструктивных элементов ДТ при условии действия указанного тока, за указанное время
      * @param currect - ток протекающий через ДТ за время sec выраженное в секундах
@@ -207,17 +216,28 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         /*Пересчитаем коэффициенты теплоотдачи на начальную температуру вычислений*/
         ht.updateParams(temp)
         /*Структура с ошибкой*/
-        var error: CError;
+        var error = CError(0.0,0.0,0.0,0.0);
         /*Обновим значения тока в классе DT*/
         this.current(_current)
 
         val shift_step = 0.1
-        var cntr: Double = 0
+        var cntr: Double = 0.0
         while (cntr <= _sec) {
             rk45(error, shift_step)
+            update_step(shift_step, error)
             cntr += shift_step
-            println( cntr, error.toString() )
+            println( "cntr $cntr" )
+     //       println ( error.toString() )
         }
     }
 }
 
+/*
+  fun calc_next() {
+        var temp = DT_temp(273.0, 273.0, 273.0,273.0)
+        var hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,293.0,0.5,1.0)
+        var type = DT_type(40.0,390.0,0.0172,288.0, 10.872,0.58, 70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.760000,0.3,1.3,0.86,0.258,0.9, 2000.0, "DT-0.6-100")
+        var dt = DT(temp, type, hc, 0.0)
+        dt.calc_next(2000.0, 5.0)
+    }
+ */
