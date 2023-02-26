@@ -201,9 +201,17 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
     /**
      * Функция управления шагом расчета
      */
-    fun update_step(var step: Double, val err: CError)
+    fun update_step( _step: Double,  err: CError): Double
     {
-
+        println("update")
+        var step = _step
+        if (err.oil < 0.001){
+            step = step*0.5
+        }
+        else{
+            step = step*2.0
+        }
+        return step
     }
     /**
      * Функция расчета температу конструктивных элементов ДТ при условии действия указанного тока, за указанное время
@@ -220,18 +228,30 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         /*Обновим значения тока в классе DT*/
         this.current(_current)
 
-        val shift_step = 0.1
+        var shift_step = 0.1
         var cntr: Double = 0.0
         while (cntr <= _sec) {
             rk45(error, shift_step)
-            update_step(shift_step, error)
+            //shift_step = update_step(shift_step, error)
+            println("step_sfter: $shift_step")
             cntr += shift_step
             println( "cntr $cntr" )
      //       println ( error.toString() )
         }
     }
 }
-
+fun dt_ht_create(type: String): DT
+{
+    var temp = DT_temp(293.0, 293.0, 293.0,293.0)
+    var hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,253.0,0.5,1.0)
+    if ("DT-0.6-1000" == type){
+        var type = DT_type(40.0,390.0,0.0172,288.0, 10.872,0.58, 70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.760000,0.3,1.3,0.86,0.258,0.9, 2000.0, "DT-0.6-1000")
+        return DT(temp, type, hc, 0.0)
+    }
+    else{
+        throw Exception("Not supported type $type")
+    }
+}
 /*
   fun calc_next() {
         var temp = DT_temp(273.0, 273.0, 273.0,273.0)
