@@ -75,7 +75,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
      */
     fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double ): Double
     {
-        val f1 = current().pow(2)*(1+0.04*(coil_temp-293))*type.coil_L*type.coil_R/type.coil_CSA
+        val f1 = current().pow(2)*(1+0.04*(coil_temp-293.0))*type.coil_L*type.coil_R/type.coil_CSA
         val f2 = ht.h_coil_oil*type.coil_S*(coil_temp-oil_temp)
         return (f1 - f2) / (type.coil_M*type.coil_HC)
     }
@@ -117,7 +117,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         return ( heating - colling ) / ( type.body_M*type.body_HC );
     }
     /**
-     * Расчет теплового баланса методом руншге-кнутта 4-5 порядка
+     * Расчет теплового баланса методом руншге-кнутта 4-5 порядка, портирование с проекта на С++
      * @param error ошибка на данном шаге рассчета
      * @param step шаг расчета
      * @return Unit(none)
@@ -195,8 +195,72 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         error.oil = oil_4ord - oil_5ord;
         error.core = core_4ord - core_5ord;
         error.body = body_4ord - body_5ord;
-        println(error)
-        println(temp)
+//        println("RK45_error $error")
+//        println("RK45_temp $temp")
+    }
+
+    /**
+     * Расчет теплового баланса методом руншге-кнутта 4-5 порядкас модификацией Mерсона (http://pogorskiy.narod.ru/merson.htm)
+     * @param error ошибка на данном шаге рассчета
+     * @param step шаг расчета
+     * @return Unit(none)
+     */
+    fun rk45_merson( error: CError, step: Double )
+    {
+        val dt_temp = temp
+        val kcoil1 = step * coil_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
+        val koil1  = step * oil_ode(  dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
+        val kcore1 = step * core_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
+        val kbody1 = step * body_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
+
+        val kcoil2 = step * coil_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
+        val koil2  = step * oil_ode ( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
+        val kcore2 = step * core_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
+        val kbody2 = step * body_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
+
+        val kcoil2_c = dt_temp.coil+0.5*(kcoil1+kcoil2)
+        val koil2_c =  dt_temp.oil+0.5*(koil1+koil2)
+        val kcore2_c = dt_temp.core+0.5*(kcore1+kcore2)
+        val kbody2_c = dt_temp.body+0.5*(kbody1+kbody2)
+        val kcoil3 = step * coil_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
+        val koil3  = step * oil_ode ( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
+        val kcore3 = step * core_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
+        val kbody3 = step * body_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
+
+        val kcoil3_c = dt_temp.coil + 3.0*kcoil1/8.0 + 9.0*kcoil3/8.0
+        val koil3_c  = dt_temp.oil  + 3.0*koil1/8.0 + 9.0*koil3/8.0
+        val kcore3_c = dt_temp.core + 3.0*kcore1/8.0 + 9.0*kcore3/8.0
+        val kbody3_c = dt_temp.body + 3.0*kbody1/8.0 + 9.0*kbody3/8.0
+        val kcoil4 = step * coil_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
+        val koil4  = step * oil_ode ( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
+        val kcore4 = step * core_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
+        val kbody4 = step * body_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
+
+        val kcoil4_c = dt_temp.coil + (3.0*kcoil1 - 9.0*kcoil3 + 12.0*kcoil4)/2.0
+        val koil4_c  = dt_temp.oil +  (3.0*koil1  - 9.0*koil3  + 12.0*koil4 )/2.0
+        val kcore4_c = dt_temp.core + (3.0*kcore1 - 9.0*kcore3 + 12.0*kcore4)/2.0
+        val kbody4_c = dt_temp.body + (3.0*kbody1 - 9.0*kbody3 + 12.0*kbody4)/2.0
+        val kcoil5 = step * coil_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
+        val koil5  = step * oil_ode ( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
+        val kcore5 = step * core_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
+        val kbody5 = step * body_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
+
+        val coil = dt_temp.coil + ( kcoil1 + 4.0*kcoil4 + kcoil5 )/2.0
+        val oil  = dt_temp.oil  + ( koil1  + 4.0*koil4  + koil5 )/2.0
+        val core = dt_temp.core + ( kcore1 + 4.0*kcore4 + kcore5 )/2.0
+        val body = dt_temp.body + ( kbody1 + 4.0*kbody4 + kbody5 )/2.0
+
+        temp.coil = coil
+        temp.oil = oil
+        temp.core = core
+        temp.body = body
+
+        error.coil = kcoil1-9*kcoil3/2+4*kcoil4-kcoil5/2
+        error.oil =  koil1-9*koil3/2+4*koil4-koil5/2
+        error.core = kcore1-9*kcore3/2+4*kcore4-kcore5/2
+        error.body = kbody1-9*kbody3/2+4*kbody4-kbody5/2
+//        println("Merson_error $error")
+//        println("Merson_tem $temp")
     }
     /**
      * Функция управления шагом расчета
@@ -221,6 +285,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
      */
     fun calc_next (_current: Double, _sec: Double)
     {
+        val tbeg = System.currentTimeMillis()
         /*Пересчитаем коэффициенты теплоотдачи на начальную температуру вычислений*/
         ht.updateParams(temp)
         /*Структура с ошибкой*/
@@ -232,12 +297,42 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
         var cntr: Double = 0.0
         while (cntr <= _sec) {
             rk45(error, shift_step)
+            rk45_merson(error, shift_step)
             //shift_step = update_step(shift_step, error)
-            println("step_sfter: $shift_step")
+            //println("step_sfter: $shift_step")
             cntr += shift_step
-            println( "cntr $cntr" )
-     //       println ( error.toString() )
+            //println( "cntr $cntr" )
+            //println ( error.toString() )
         }
+        val tend = System.currentTimeMillis()
+        println("RK45_tem $temp")
+        println("RK45_error $error")
+        println("RK45_duration ${tend-tbeg}")
+    }
+    fun calc_next_merson (_current: Double, _sec: Double)
+    {
+        val tbeg = System.currentTimeMillis()
+        /*Пересчитаем коэффициенты теплоотдачи на начальную температуру вычислений*/
+        ht.updateParams(temp)
+        /*Структура с ошибкой*/
+        var error = CError(0.0,0.0,0.0,0.0);
+        /*Обновим значения тока в классе DT*/
+        this.current(_current)
+
+        var shift_step = 0.1
+        var cntr: Double = 0.0
+        while (cntr <= _sec) {
+            rk45_merson(error, shift_step)
+            //shift_step = update_step(shift_step, error)
+            //println("step_sfter: $shift_step")
+            cntr += shift_step
+            //println( "cntr $cntr" )
+            //println ( error.toString() )
+        }
+        val tend = System.currentTimeMillis()
+        println("Merson_error $error")
+        println("Merson_tem $temp")
+        println("Merson_duration ${tend-tbeg}")
     }
 }
 fun dt_ht_create(dt_type: String): DT
