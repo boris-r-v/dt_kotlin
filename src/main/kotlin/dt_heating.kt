@@ -1,82 +1,114 @@
+import java.io.PrintWriter
 import kotlin.math.pow
+import kotlin.math.log
+import kotlin.math.abs
 
 
+/**
+ * Класс для хранения ошибка расчета теплового баланса ДТ на каком-то расчетном шаге
+ * Учитывается отдельно ошибки для корпуса, масла, сердечника и обмотки
+ */
 data class CError (var oil:Double,  var coil:Double, var core:Double, var body:Double){}
 /**
- * This data class for storing data for one DT type
- * i.e. DT-0.6-1000, DT-0.4-1500
- * Used in DT class
+ * Класс с данными контструкции дроссель-трансформатора
+ * @param coil_HC - теплоемкость материала токовой обмотки ДТ
+ * @param coil_M - масса токовой обмотки ДТ
+ * @param coil_R - сопротивление обмотки тяговому току при 20Гр Цельсия
+ * @param coil_S - площадь поверхности теплоотдачи обмотки
+ * @param core_HC - теплопроводность материала сердечника ДТ
+ * @param core_M - масса сердечника ДТ
+ * @param core_S - плошать теплообмена сердченика ДТ
+ * @param oil_HC - теплоемкость масла ДТ
+ * @param oil_M - масса масла ДТ
+ * @param body_HC - теплоемкость корпуса ДТ
+ * @param body_M - масса корпуса ДТ (вместе с крышкой)
+ * @param body_air_S - эквивалентная площадь поверхности (с учетом вертикальных и горизонтальных сторон ДТ) учавствующая в конвективном теплообмене с воздухом
+ * @param body_grayness - степень черноты поверхности ДТ
+ * @param body_ground_S - площадь повержхности ДТ учавствующая в кондуктивном теплообменен с землей (передача тепла от ДТ в землю)
+ * @param body_oil_S - плошать теплообмена с маслом
+ * @param body_radiation_S - площадь поверхности ДТ с которой возможно излучение тепла в окружающую среду (обычно площадь поверхности ДТ, без учета площади олснования на которм он стоит)
+ * @param body_sun_S - площадь ДТ подверженная нагреву солнечным светом
+ * @param nominal_current - номинальный ток ДТ (пока не используется)
+ * @param name - имя типа ДТ
  */
 data class DT_type(
-    val coil_M: Double,    val coil_HC: Double,    val coil_R: Double,    val coil_CSA: Double,    val coil_L: Double,    val coil_S: Double,
+    val coil_M: Double,    val coil_HC: Double,    val coil_R:Double,    val coil_S: Double,
     val core_M: Double,    val core_HC: Double,    val core_S: Double,
-    val oil_M: Double,    val oil_HC: Double,
+    val oil_M: Double,     val oil_HC: Double,
     val body_M: Double,    val body_HC: Double,    val body_oil_S: Double,    val body_air_S: Double,    val body_radiation_S: Double,    val body_ground_S: Double,    val body_sun_S: Double,    val body_grayness: Double,
     val nominal_current: Double,
     val name: String
 ){}
 /**
- * Class with current DT temp
+ * Класс с данными по температуре элементов дроссель-трансформатора
+ * @param coil - температура обмотки
+ * @param oil  - температура масла
+ * @param core - температура сердечника
+ * @param body - температура корпуса
  */
 data class DT_temp(var coil: Double, var oil: Double, var core: Double, var body: Double ){}
 /**
- * Class with current heat transfer coefficients 
+ * Класс с данными по коэффициентам тепрлопередачи и другим данным необходимым для теплового расчета
+ * @param h_coil_oil - коэффициент теплопередачи от обмотке маслу, пересчитывается в зависимости от температуры масла
+ * @param h_oil_core - коэффициент теплопередачи от масла cthltxybre, пересчитывается в зависимости от температуры масла
+ * @param h_oil_body - коэффициент теплопередачи от масла корпусу, пересчитывается в зависимости от температуры масла
+ * @param h_body_air - коэффициент теплопередачи от корпуса ДТ в воздух, пересчитывается в зависимости от температуры корпуса
+ * @param h_body_ground - коэфыфициент теплопередачи от куорпуса ДТ в землю, не пересчитывается в процессе расчета, константа
+ * @param sun_radiation - поток солнечного излучения
+ * @param external_temp - температура окружающей среды
+ * @param cloud - облачность на небе в долях единицы, где 0-это сплошная обласность, 1-ясно, без облаков
+ * @param wind - скороть ветра в м/с
  */
-class DT_heat_transfer ( var h_coil_oil: Double, var h_oil_body: Double, var h_oil_core: Double,
-                         var h_body_air: Double, var h_body_ground: Double,
-                         var sun_radiation: Double, var external_temp: Double,
-                         var cloud: Double, var wind: Double ) {
+data class DT_heat_transfer ( var h_coil_oil: Double, var h_oil_body: Double, var h_oil_core: Double,
+                              var h_body_air: Double, var h_body_ground: Double,
+                              var sun_radiation: Double, var external_temp: Double,
+                              var cloud: Double, var wind: Double )
 
-    fun getPr(i_degC: Double): Double {
-        val degC = i_degC - 273;
-        if (degC <= 0) return 866.0;
-        if (0 < degC && degC <= 40) return (0.0002291667 * degC.pow(4) - 0.0314166667 * degC.pow(3) + 1.7620833333 * degC.pow(
-            2
-        ) - 52.9083333 * degC + 866);
-        if (40 < degC && degC <= 120) return (0.000001 * 2.5553613053 * degC.pow(4) - 0.0010518065 * degC.pow(3) + 0.169326049 * degC.pow(
-            2
-        ) - 13.1306351981 * degC + 459.99);
-        return 34.9;
-    }
-
-    fun getEpsilon(degtK_fluid: Double, degK_solid: Double): Double {
-        return (getPr(degtK_fluid) / getPr(degK_solid)).pow(0.25)
-    }
-
-    fun updateParams(dt_temp: DT_temp) {
-        h_body_air = 2.5 * (dt_temp.body - external_temp).pow(0.25) * (293 / dt_temp.body).pow(0.25) + 4.2 * wind
-        val base = 0.5255 * dt_temp.oil - 75.898
-        h_coil_oil = base * getEpsilon(dt_temp.oil, dt_temp.coil)
-        h_oil_body = base * getEpsilon(dt_temp.oil, dt_temp.body)
-        h_oil_core = base * getEpsilon(dt_temp.oil, dt_temp.core)
-    }
+/**
+ * Функция для пересчета коэффициентов теплопередачи в зависимости от температуры
+ */
+fun updateHtParams(dt_temp: DT_temp, dt_ht: DT_heat_transfer) {
+        val difT = dt_temp.body - dt_ht.external_temp + 0.001
+        dt_ht.h_body_air = 2.1 + 1.2834 * log(difT, 2.73) + 1.51 + 4.2 * dt_ht.wind
+        dt_ht.h_coil_oil = 0.4019 * dt_temp.oil + 110.09
+        dt_ht.h_oil_body = dt_ht.h_coil_oil
+        dt_ht.h_oil_core = dt_ht.h_coil_oil
 }
 
 /**
  * Класс расчета теплового баланса ДТ
+ * @param temp - температура элементов ДТ
+ * @param type - тип ДТ
+ * @param ht - значения коэффциентов теплопередачи
  */
-class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var current_: Double){
+class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
+    var temp_C = DT_temp(20.0, 20.0, 20.0,20.0)
+    var current_ = 0.0
+    val Q = mutableMapOf<String, Array<Double> >("oil" to Array(2, {0.0}), "coil" to Array(2, {0.0}), "core" to Array(2, {0.0}), "body" to Array(2, {0.0}))
+    val Csb = 5.6e-8
+
     /**
      * Установить значение тока ДТ
      */
     fun current ( v: Double ){
-        current_ = v;
+        current_ = v
     }
-
     /**
-     * Прочитать значенте тока ДТ
+     * Прочитать значение тока ДТ
      */
-    fun current(): Double = current_;
+    fun current(): Double = current_
 
     /**
      * Функция дифференциального уравнения теплового баланса обмотки
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру обмотки
      */
-    fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double ): Double
+    fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
-        val f1 = current().pow(2)*(1+0.04*(coil_temp-293.0))*type.coil_L*type.coil_R/type.coil_CSA
+        val f1 = type.coil_R*(1+0.004*(coil_temp-293.0))*current().pow(2)
         val f2 = ht.h_coil_oil*type.coil_S*(coil_temp-oil_temp)
+        Q["coil"]!![idx] = f1 - f2
+        //println("HEAT FOR $idx COIL ${Q["coil"]?.get(idx)}")
         return (f1 - f2) / (type.coil_M*type.coil_HC)
     }
     /**
@@ -84,21 +116,24 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру масла
      */
-    fun oil_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double ): Double
+    fun oil_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
         val f1 = (ht.h_coil_oil*type.coil_S*(coil_temp - oil_temp) )        //heat transfer from coil to oil
         val f2 = (ht.h_oil_body*type.body_oil_S*(oil_temp - body_temp) )    //heat transfer from oil to body
         val f3 = (ht.h_oil_core*type.core_S*(oil_temp - core_temp) )        //heat transfer from oil to core
-        val f4 = (ht.h_body_air*0.1*(oil_temp - ht.external_temp ) )        //head transfer from oil to air under cover
-        return (  f1 - f2 - f3 - f4 ) / ( type.oil_M*type.oil_HC )          //oil temp
+        Q["oil"]!![idx] = (f1 - f2 - f3)
+        //println("HEAT FOR $idx OIL ${Q["oil"]?.get(idx)}")
+        return ( f1 - f2 - f3 ) / ( type.oil_M*type.oil_HC )          //oil temp
     }
     /**
      * Функция дифференциального уравнения теплового баланса сердечника
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру сердечника
      */
-    fun core_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double ): Double
+    fun core_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
+        Q["core"]!![idx] = ht.h_oil_core*type.core_S*(oil_temp - core_temp)
+        /*println("HEAT $idx FOR CORE ${Q["core"]?.get(idx)}")*/
         return ( ht.h_oil_core*type.core_S*(oil_temp - core_temp) ) / ( type.core_M*type.core_HC )
     }
     /**
@@ -106,258 +141,154 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer, var cur
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру корпуса
      */
-    fun body_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double ): Double
+    fun body_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
-        val Csb = 5.6e-8
         val f1 = ht.h_body_air*type.body_air_S*(body_temp - ht.external_temp)        //ковекция с корпуса
         val f2 = ht.h_body_ground*type.body_ground_S*(body_temp - ht.external_temp )  //кондукция с корпуса
         val f3 = type.body_grayness*type.body_radiation_S*Csb*(body_temp.pow(4) - ht.external_temp.pow(4 ) ) //излучение с корпуса
-        val colling = f1 + f2 + f3
+        val cooling = f1 + f2 + f3
         val heating = (ht.h_oil_body*type.body_oil_S*(oil_temp - body_temp)) + (type.body_grayness*type.body_sun_S*ht.sun_radiation*ht.cloud)
-        return ( heating - colling ) / ( type.body_M*type.body_HC );
+        Q["body"]!![idx] = heating - cooling
+        //println("HEAT FOR $idx BODY ${Q["body"]?.get(idx)}")
+        return ( heating - cooling ) / ( type.body_M*type.body_HC )
     }
     /**
-     * Расчет теплового баланса методом руншге-кнутта 4-5 порядка, портирование с проекта на С++
-     * @param error ошибка на данном шаге рассчета
-     * @param step шаг расчета
-     * @return Unit(none)
+      *Расчет теплового баланса своей реализацией многоходового алгоритма численнго моделирования
+      * @param i_error - место куда записать значения ощибки на данном шаге расчета
+      * @param step - шаг расчета
+      * @param max_error - разница температур между предыдушим и текущим расчетным шагом, если ошибка меньше данного числа считаем что расчет сошелся
      */
-    fun rk45( error: CError, step: Double )
+    fun my_bdf( i_error: CError, step: Double, max_error: Double = 1E-10 )
     {
+        println("Trace my_bdf**************************************")
+        val error = CError(100.0,100.0,100.0,100.0)
         val dt_temp = temp
-        val kcoil0 = step * coil_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )
-        val koil0  = step * oil_ode(  dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )
-        val kcore0 = step * core_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )
-        val kbody0 = step * body_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )
+        /*Расчитаем температуру на i+1 шаге*/
+        val T_coil = dt_temp.coil + step * coil_ode( dt_temp.coil, dt_temp.oil, dt_temp.core, dt_temp.body )
+        val T_oil  = dt_temp.oil  + step * oil_ode(  dt_temp.coil, dt_temp.oil, dt_temp.core, dt_temp.body )
+        val T_core = dt_temp.core + step * core_ode( dt_temp.coil, dt_temp.oil, dt_temp.core, dt_temp.body )
+        val T_body = dt_temp.body + step * body_ode( dt_temp.coil, dt_temp.oil, dt_temp.core, dt_temp.body )
 
-        val kcoil1_c  = dt_temp.coil + kcoil0/2;
-        val koil1_c   = dt_temp.oil + koil0/2
-        val kcore1_c  = dt_temp.core + kcore0/2
-        val kbody1_c  = dt_temp.body + kbody0/2
-        val kcoil1 = step * coil_ode( kcoil1_c, koil1_c, kcore1_c, kbody1_c );
-        val koil1  = step * oil_ode ( kcoil1_c, koil1_c, kcore1_c, kbody1_c );
-        val kcore1 = step * core_ode( kcoil1_c, koil1_c, kcore1_c, kbody1_c );
-        val kbody1 = step * body_ode( kcoil1_c, koil1_c, kcore1_c, kbody1_c );
+        coil_ode( T_coil, T_oil, T_core, T_body,1 )
+        oil_ode(  T_coil, T_oil, T_core, T_body,1 )
+        core_ode( T_coil, T_oil, T_core, T_body,1 )
+        body_ode( T_coil, T_oil, T_core, T_body,1 )
 
-        val kcoil2_c = dt_temp.coil + (kcoil0 + kcoil1)/4
-        val koil2_c  = dt_temp.oil +  (koil0 + koil1)/4
-        val kcore2_c = dt_temp.core + (kcore0 + kcore1)/4
-        val kbody2_c = dt_temp.body + (kbody0 + kbody1)/4
-        val kcoil2 = step * coil_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )
-        val koil2  = step * oil_ode ( kcoil2_c, koil2_c, kcore2_c, kbody2_c )
-        val kcore2 = step * core_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )
-        val kbody2 = step * body_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )
+        var T_coil3 = dt_temp.coil + step * ((Q["coil"]!!.get(0) + Q["coil"]!!.get(1)) / 2) / (type.coil_M * type.coil_HC)
+        var T_oil3 =  dt_temp.oil  + step * ((Q["oil"]!!.get(0) + Q["oil"]!!.get(1)) / 2) / (type.oil_M * type.oil_HC)
+        var T_core3 = dt_temp.core + step * ((Q["core"]!!.get(0) + Q["core"]!!.get(1)) / 2) / (type.core_M * type.core_HC)
+        var T_body3 = dt_temp.body + step * ((Q["body"]!!.get(0) + Q["body"]!!.get(1)) / 2) / (type.body_M * type.body_HC)
 
-        val kcoil3_c = dt_temp.coil - kcoil1 + 2*kcoil2
-        val koil3_c  = dt_temp.oil  - koil1 + 2*koil2
-        val kcore3_c = dt_temp.core - kcore1 + 2*kcore2
-        val kbody3_c = dt_temp.body - kbody1 + 2*kbody2
-        val kcoil3 = step * coil_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )
-        val koil3  = step * oil_ode ( kcoil3_c, koil3_c, kcore3_c, kbody3_c )
-        val kcore3 = step * core_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )
-        val kbody3 = step * body_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )
+        var cntr = 0
+        while (cntr < 10 && error.body > max_error && error.oil > max_error && error.coil > max_error) {
 
-        val kcoil4_c = dt_temp.coil + (7*kcoil0 + 10*kcoil1 + kcoil3)/27
-        val koil4_c  = dt_temp.oil + (7*koil0 + 10*koil1 + koil3)/27
-        val kcore4_c = dt_temp.core + (7*kcore0 + 10*kcore1 + kcore3)/27
-        val kbody4_c = dt_temp.body + (7*kbody0 + 10*kbody1 + kbody3)/27
-        val kcoil4 = step * coil_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val koil4  = step * oil_ode ( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val kcore4 = step * core_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val kbody4 = step * body_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
+            val T_coil4 = T_coil3
+            val T_oil4 = T_oil3
+            val T_core4 = T_core3
+            val T_body4 = T_body3
 
-        val kcoil5_c = dt_temp.coil + (28*kcoil0 - 128*kcoil1 + 546*kcoil2 + 54*kcoil3 - 378*kcoil4)/625
-        val koil5_c  = dt_temp.oil +  (28*koil0 - 128*koil1 + 546*koil2 + 54*koil3 - 378*koil4)/625
-        val kcore5_c = dt_temp.core + (28*kcore0 - 128*kcore1 + 546*kcore2 + 54*kcore3 - 378*kcore4)/625
-        val kbody5_c = dt_temp.body + (28*kbody0 - 128*kbody1 + 546*kbody2 + 54*kbody3 - 378*kbody4)/625
-        val kcoil5 = step * coil_ode( kcoil5_c, koil5_c, kcore5_c, kbody5_c )
-        val koil5  = step * oil_ode ( kcoil5_c, koil5_c, kcore5_c, kbody5_c )
-        val kcore5 = step * core_ode( kcoil5_c, koil5_c, kcore5_c, kbody5_c )
-        val kbody5 = step * body_ode( kcoil5_c, koil5_c, kcore5_c, kbody5_c )
+            coil_ode( T_coil3, T_oil3, T_core3, T_body3,1 )
+            oil_ode(  T_coil3, T_oil3, T_core3, T_body3,1 )
+            core_ode( T_coil3, T_oil3, T_core3, T_body3,1 )
+            body_ode( T_coil3, T_oil3, T_core3, T_body3,1 )
 
-        val coil_4ord = dt_temp.coil + ( kcoil0 + 4*kcoil2 + kcoil3 )/6
-        val oil_4ord  = dt_temp.oil  +  ( koil0 +  4*koil2 +  koil3  )/6
-        val core_4ord = dt_temp.core +  ( kcore0 + 4*kcore2 + kcore3 )/6
-        val body_4ord = dt_temp.body +  ( kbody0 + 4*kbody2 + kbody3 )/6
+            T_coil3 = dt_temp.coil + step * ((Q["coil"]!!.get(0) + Q["coil"]!!.get(1)) / 2) / (type.coil_M * type.coil_HC)
+            T_oil3 =  dt_temp.oil  + step * ((Q["oil"]!!.get(0) + Q["oil"]!!.get(1)) / 2) / (type.oil_M * type.oil_HC)
+            T_core3 = dt_temp.core + step * ((Q["core"]!!.get(0) + Q["core"]!!.get(1)) / 2) / (type.core_M * type.core_HC)
+            T_body3 = dt_temp.body + step * ((Q["body"]!!.get(0) + Q["body"]!!.get(1)) / 2) / (type.body_M * type.body_HC)
+            error.coil = abs(T_coil4 - T_coil3 )
+            error.oil =  abs(T_oil4 - T_oil3)
+            error.core = abs(T_core4 - T_core3)
+            error.body = abs(T_body4 - T_body3)
+            println("count $cntr, ERR: $error")
+            ++cntr
+            //FIX ME если мы сделали 10 итераций а решение не сошлось - то что-то нужно сделать, сейчас оставляем результат последней итерации с ошибкой
+        }
+        temp.coil = T_coil3
+        temp.oil = T_oil3
+        temp.core = T_core3
+        temp.body = T_body3
 
-        val coil_5ord = dt_temp.coil + ( 14*kcoil0 + 35*kcoil3 + 162*kcoil4 + 125*kcoil5 )/336
-        val oil_5ord  = dt_temp.oil  +  ( 14*koil0 +  35*koil3  + 162*koil4  + 125*koil5 )/336
-        val core_5ord = dt_temp.core +  ( 14*kcore0 + 35*kcore3 + 162*kcore4 + 125*kcore5 )/336
-        val body_5ord = dt_temp.body +  ( 14*kbody0 + 35*kbody3 + 162*kbody4 + 125*kbody5 )/336
+        temp_C.coil = temp.coil-273.0
+        temp_C.oil  = temp.oil-273.0
+        temp_C.core = temp.core-273.0
+        temp_C.body = temp.body-273.0
 
-
-        temp.coil = coil_5ord
-        temp.oil = oil_5ord
-        temp.core = core_5ord
-        temp.body = body_5ord
-
-        error.coil = coil_4ord - coil_5ord;
-        error.oil = oil_4ord - oil_5ord;
-        error.core = core_4ord - core_5ord;
-        error.body = body_4ord - body_5ord;
-//        println("RK45_error $error")
-//        println("RK45_temp $temp")
+        i_error.coil = error.coil
+        i_error.oil  = error.oil
+        i_error.core = error.core
+        i_error.body = error.body
     }
 
     /**
-     * Расчет теплового баланса методом руншге-кнутта 4-5 порядкас модификацией Mерсона (http://pogorskiy.narod.ru/merson.htm)
-     * @param error ошибка на данном шаге рассчета
-     * @param step шаг расчета
-     * @return Unit(none)
+     * Функция расчета проводящая решение системы дифференциальных уравнений теплового баланса методом BDF
+     * @param _error - значение ошибки на данном шаге расчета
+     * @param _step - временной шаг данного расчета в секундах
      */
-    fun rk45_merson( error: CError, step: Double )
+    fun calc_next_step( _error: CError, _step: Double)
     {
-        val dt_temp = temp
-        val kcoil1 = step * coil_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
-        val koil1  = step * oil_ode(  dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
-        val kcore1 = step * core_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
-        val kbody1 = step * body_ode( dt_temp.oil, dt_temp.coil, dt_temp.core, dt_temp.body )/3.0
-
-        val kcoil2 = step * coil_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
-        val koil2  = step * oil_ode ( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
-        val kcore2 = step * core_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
-        val kbody2 = step * body_ode( dt_temp.coil+kcoil1, dt_temp.oil+koil1, dt_temp.core+kcore1, dt_temp.body+kbody1 )/3.0
-
-        val kcoil2_c = dt_temp.coil+0.5*(kcoil1+kcoil2)
-        val koil2_c =  dt_temp.oil+0.5*(koil1+koil2)
-        val kcore2_c = dt_temp.core+0.5*(kcore1+kcore2)
-        val kbody2_c = dt_temp.body+0.5*(kbody1+kbody2)
-        val kcoil3 = step * coil_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
-        val koil3  = step * oil_ode ( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
-        val kcore3 = step * core_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
-        val kbody3 = step * body_ode( kcoil2_c, koil2_c, kcore2_c, kbody2_c )/3.0
-
-        val kcoil3_c = dt_temp.coil + 3.0*kcoil1/8.0 + 9.0*kcoil3/8.0
-        val koil3_c  = dt_temp.oil  + 3.0*koil1/8.0 + 9.0*koil3/8.0
-        val kcore3_c = dt_temp.core + 3.0*kcore1/8.0 + 9.0*kcore3/8.0
-        val kbody3_c = dt_temp.body + 3.0*kbody1/8.0 + 9.0*kbody3/8.0
-        val kcoil4 = step * coil_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
-        val koil4  = step * oil_ode ( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
-        val kcore4 = step * core_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
-        val kbody4 = step * body_ode( kcoil3_c, koil3_c, kcore3_c, kbody3_c )/3.0
-
-        val kcoil4_c = dt_temp.coil + (3.0*kcoil1 - 9.0*kcoil3 + 12.0*kcoil4)/2.0
-        val koil4_c  = dt_temp.oil +  (3.0*koil1  - 9.0*koil3  + 12.0*koil4 )/2.0
-        val kcore4_c = dt_temp.core + (3.0*kcore1 - 9.0*kcore3 + 12.0*kcore4)/2.0
-        val kbody4_c = dt_temp.body + (3.0*kbody1 - 9.0*kbody3 + 12.0*kbody4)/2.0
-        val kcoil5 = step * coil_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val koil5  = step * oil_ode ( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val kcore5 = step * core_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-        val kbody5 = step * body_ode( kcoil4_c, koil4_c, kcore4_c, kbody4_c )
-
-        val coil = dt_temp.coil + ( kcoil1 + 4.0*kcoil4 + kcoil5 )/2.0
-        val oil  = dt_temp.oil  + ( koil1  + 4.0*koil4  + koil5 )/2.0
-        val core = dt_temp.core + ( kcore1 + 4.0*kcore4 + kcore5 )/2.0
-        val body = dt_temp.body + ( kbody1 + 4.0*kbody4 + kbody5 )/2.0
-
-        temp.coil = coil
-        temp.oil = oil
-        temp.core = core
-        temp.body = body
-
-        error.coil = kcoil1-9*kcoil3/2+4*kcoil4-kcoil5/2
-        error.oil =  koil1-9*koil3/2+4*koil4-koil5/2
-        error.core = kcore1-9*kcore3/2+4*kcore4-kcore5/2
-        error.body = kbody1-9*kbody3/2+4*kbody4-kbody5/2
-//        println("Merson_error $error")
-//        println("Merson_tem $temp")
+        my_bdf(_error, _step)
+        updateHtParams(temp, ht)
+        println ( "calc_next_bdf ERR : $_error" )
+        println ( "calc_next_bdf Temp: $temp_C" )
+        println ( "calc_next_bdf HT  : $ht")
     }
+
     /**
-     * Функция управления шагом расчета
+     * Функция расчета доступная извне,
+     * @param current - значение тока на данном временном промежутке
+     * @param sec: - длительность данного промежутка в секундах
      */
-    fun update_step( _step: Double,  err: CError): Double
+    fun calc(current: Double, sec: Int )
     {
-        println("update")
-        var step = _step
-        if (err.oil < 0.001){
-            step = step*0.5
-        }
-        else{
-            step = step*2.0
-        }
-        return step
-    }
-    /**
-     * Функция расчета температу конструктивных элементов ДТ при условии действия указанного тока, за указанное время
-     * @param currect - ток протекающий через ДТ за время sec выраженное в секундах
-     * @param sec - время протекания тока current выраенное в секундах
-     * @return - Unit
-     */
-    fun calc_next (_current: Double, _sec: Double)
-    {
-        val tbeg = System.currentTimeMillis()
-        /*Пересчитаем коэффициенты теплоотдачи на начальную температуру вычислений*/
-        ht.updateParams(temp)
-        /*Структура с ошибкой*/
-        var error = CError(0.0,0.0,0.0,0.0);
-        /*Обновим значения тока в классе DT*/
-        this.current(_current)
+        var time = 0.0
+        var step = 1.0
+        val writer = PrintWriter("./file.csv")
+        writer.append("temp_C.coil,temp_C.oil,temp_C.core,temp_C.body\n")
+        this.current(current)
+        val error = CError(0.0,0.0,0.0,0.0)
 
-        var shift_step = 0.1
-        var cntr: Double = 0.0
-        while (cntr <= _sec) {
-            rk45(error, shift_step)
-            rk45_merson(error, shift_step)
-            //shift_step = update_step(shift_step, error)
-            //println("step_sfter: $shift_step")
-            cntr += shift_step
-            //println( "cntr $cntr" )
-            //println ( error.toString() )
-        }
-        val tend = System.currentTimeMillis()
-        println("RK45_tem $temp")
-        println("RK45_error $error")
-        println("RK45_duration ${tend-tbeg}")
-    }
-    fun calc_next_merson (_current: Double, _sec: Double)
-    {
-        val tbeg = System.currentTimeMillis()
-        /*Пересчитаем коэффициенты теплоотдачи на начальную температуру вычислений*/
-        ht.updateParams(temp)
-        /*Структура с ошибкой*/
-        var error = CError(0.0,0.0,0.0,0.0);
-        /*Обновим значения тока в классе DT*/
-        this.current(_current)
+        while ( sec > time )
+        {
+            time += step
+            calc_next_step( error, step)
+            println ("study time: $time, temp_C $temp_C ")
+            writer.append("${temp_C.coil}, ${temp_C.oil}, ${temp_C.core}, ${temp_C.body} \n")
+            if (error.oil == 0.0 && error.body == 0.0 && error.coil == 0.0 && error.core == 0.0) {
+                step *=1
+            }
 
-        var shift_step = 0.1
-        var cntr: Double = 0.0
-        while (cntr <= _sec) {
-            rk45_merson(error, shift_step)
-            //shift_step = update_step(shift_step, error)
-            //println("step_sfter: $shift_step")
-            cntr += shift_step
-            //println( "cntr $cntr" )
-            //println ( error.toString() )
         }
-        val tend = System.currentTimeMillis()
-        println("Merson_error $error")
-        println("Merson_tem $temp")
-        println("Merson_duration ${tend-tbeg}")
+        writer.close()
     }
 }
+
+/**
+ * Фабрика создани ДТ
+ * 16-Mar-2023 - поддеривается только ДТ-0.2-1000 и ДТ-0.6-1000, для ДТ-0.2-500 и ДТ-0.6-500 не верные все параметры кроме coil_R
+ */
 fun dt_ht_create(dt_type: String): DT
 {
     val temp = DT_temp(293.0, 293.0, 293.0,293.0)
-    var hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,293.0,0.5,1.0)
-    if (0 == dt_type.compareTo("DT-0.6-1000") || 0 == dt_type.compareTo("DT-0.2-1000") ){
-        var type = DT_type(40.0,390.0,0.0172,288.0, 10.872,0.58, 70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.760000,0.3,1.3,0.86,0.258,0.9, 2000.0, "DT-0.6-1000")
-        return DT(temp, type, hc, 0.0)
+    val hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,293.0,0.5,1.0)
+    if (0 == dt_type.compareTo("DT-0.6-1000") ){
+        val type = DT_type(40.0,390.0,0.0011,0.58,70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+        return DT(temp, type, hc)
     }
-    else if ( 0 == dt_type.compareTo("DT-0.4-1500") ){
-        var type = DT_type(40.0,390.0,0.0172,288.0, 10.872,0.58, 70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.760000,0.3,1.3,0.86,0.258,0.9, 2000.0, "DT-0.2-1000")
-        return DT(temp, type, hc, 0.0)
+    if (0 == dt_type.compareTo("DT-0.2-1000")  ){
+        val type = DT_type(40.0,390.0,0.00088,0.58,70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+        return DT(temp, type, hc)
+    }
+    if (0 == dt_type.compareTo("DT-0.6-500") ){
+        val type = DT_type(40.0,390.0,0.00242,0.58,70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+        return DT(temp, type, hc)
+    }
+    if (0 == dt_type.compareTo("DT-0.2-500")  ){
+        val type = DT_type(40.0,390.0,0.00143,0.58,70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+        return DT(temp, type, hc)
     }
     else{
         throw Exception("Not supported type $dt_type")
     }
 
 }
-/*
-  fun calc_next() {
-        var temp = DT_temp(273.0, 273.0, 273.0,273.0)
-        var hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,293.0,0.5,1.0)
-        var type = DT_type(40.0,390.0,0.0172,288.0, 10.872,0.58, 70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.760000,0.3,1.3,0.86,0.258,0.9, 2000.0, "DT-0.6-100")
-        var dt = DT(temp, type, hc, 0.0)
-        dt.calc_next(2000.0, 5.0)
-    }
- */
