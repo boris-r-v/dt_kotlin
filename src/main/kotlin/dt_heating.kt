@@ -1,9 +1,9 @@
-import java.io.PrintWriter
 import kotlin.math.pow
 import kotlin.math.log
 import kotlin.math.abs
 
-
+private val MAX_BDF_STEP = 10
+class MaxBdfStepExcept(message: String) : Exception(message)
 /**
  * Класс для хранения ошибка расчета теплового баланса ДТ на каком-то расчетном шаге
  * Учитывается отдельно ошибки для корпуса, масла, сердечника и обмотки
@@ -180,7 +180,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
         var T_body3 = dt_temp.body + step * ((Q["body"]!!.get(0) + Q["body"]!!.get(1)) / 2) / (type.body_M * type.body_HC)
 
         var cntr = 0
-        while (cntr < 10 && error.body > max_error && error.oil > max_error && error.coil > max_error) {
+        while (cntr < MAX_BDF_STEP && error.body > max_error && error.oil > max_error && error.coil > max_error) {
 
             val T_coil4 = T_coil3
             val T_oil4 = T_oil3
@@ -204,6 +204,10 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
             ++cntr
             //FIX ME если мы сделали 10 итераций а решение не сошлось - то что-то нужно сделать, сейчас оставляем результат последней итерации с ошибкой
         }
+        if (cntr == MAX_BDF_STEP){
+            throw MaxBdfStepExcept("Solution not convergent")
+        }
+
         temp.coil = T_coil3
         temp.oil = T_oil3
         temp.core = T_core3
@@ -222,14 +226,15 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
 
     /**
      * Функция расчета проводящая решение системы дифференциальных уравнений теплового баланса методом BDF
-     * @param _error - значение ошибки на данном шаге расчета
-     * @param _step - временной шаг данного расчета в секундах
+     * @param error - значение ошибки на данном шаге расчета
+     * @param step - временной шаг данного расчета в секундах
      */
-    private fun calc_next_step( _error: CError, _step: Double)
+    private fun calc_next_step( error: CError, step: Double)
     {
-        my_bdf(_error, _step)
+        println("calc_next_step $step")
+        my_bdf(error, step)
         updateHtParams(temp, ht)
-        println ( "calc_next_bdf ERR : $_error" )
+        println ( "calc_next_bdf ERR : $error" )
         println ( "calc_next_bdf Temp: $temp_C" )
         println ( "calc_next_bdf HT  : $ht")
     }
@@ -239,29 +244,59 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param current - значение тока на данном временном промежутке
      * @param sec: - длительность данного промежутка в секундах
      */
-    fun calc(current: Double, sec: Int )
+    fun calc(current: Double, sec: Int, writer: java.io.PrintWriter )
     {
+        /*До следующего коментария - для записи в лог*/
+        val write_sec = 10
+        var prev_write_sec = 0.0
+        /*Следующий комментарий*/
+        val tbeg = System.currentTimeMillis()
         var time = 0.0
         var step = 1.0
-        val writer = PrintWriter("./file.csv")
-        writer.append("temp_C.coil,temp_C.oil,temp_C.core,temp_C.body\n")
+        val step_mult = 1.2
+        var isChangeStep = true
+        var restep_attempt = 10
+        var exept_cntr = 0
         this.current(current)
         val error = CError(0.0,0.0,0.0,0.0)
-
+        var iter = 0
         while ( sec > time )
         {
-            time += step
-            calc_next_step( error, step)
-            println ("study time: $time, temp_C $temp_C ")
-            if (time % 36  == 0.0 ) {
-                writer.append("${temp_C.coil}, ${temp_C.oil}, ${temp_C.core}, ${temp_C.body} \n")
+            try {
+                calc_next_step(error, step)
+                time += step
+                println("study time: $time, temp_C $temp_C ")
             }
-            if (error.oil == 0.0 && error.body == 0.0 && error.coil == 0.0 && error.core == 0.0) {
-                step *=1 //управление шагом - на будущее
+            catch (e: MaxBdfStepExcept)
+            {
+                if  (restep_attempt == 0 )
+                {
+                    restep_attempt = 10
+                    isChangeStep = true
+                }
+                step = step / step_mult
+                if ( --restep_attempt == 0 )
+                {
+                    isChangeStep = false
+                }
+                ++exept_cntr
+                continue
             }
 
+            if ( time >= prev_write_sec + write_sec )
+            {
+                prev_write_sec = time
+                writer.append("${temp_C.coil}, ${temp_C.oil}, ${temp_C.core}, ${temp_C.body} \n")
+            }
+            if (isChangeStep)//(error.oil == 0.0 && error.body == 0.0 && error.coil == 0.0 && error.core == 0.0) {
+            {
+                step *= step_mult
+            }
+            iter += 1
         }
-        writer.close()
+
+        val tend = System.currentTimeMillis()
+        println ("total steps: $iter calc duration: ${tend-tbeg} exept_cntr $exept_cntr")
     }
 }
 
@@ -292,5 +327,19 @@ fun dt_ht_create(dt_type: String): DT
     else{
         throw Exception("Not supported type $dt_type")
     }
+}
 
+/**
+ * Устанавливает переденную температуру как начальную температуру ДТ
+ * Это значит что обмотка, масло, корпус и сердечник буут иметь указанную температуру
+ * Также на эту температуру будут пересчитаны коэффициенты теплопередачи
+ */
+fun set_dt_init_temp_degC(degC: Double, dt: DT)
+{
+    val degK = degC + 273
+    dt.temp.oil = degK
+    dt.temp.coil = degK
+    dt.temp.core = degK
+    dt.temp.body = degK
+    updateHtParams(dt.temp, dt.ht)
 }
