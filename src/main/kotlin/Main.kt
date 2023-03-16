@@ -12,5 +12,4 @@ fun main(args: Array<String>) {
     dt2.calc(2400.0, 3600*5)
     println ("DT: ${dt2.type}")
     println("DT temp final ${dt2.temp}")
-
 }

@@ -67,7 +67,7 @@ data class DT_heat_transfer ( var h_coil_oil: Double, var h_oil_body: Double, va
 /**
  * Функция для пересчета коэффициентов теплопередачи в зависимости от температуры
  */
-fun updateHtParams(dt_temp: DT_temp, dt_ht: DT_heat_transfer) {
+private fun updateHtParams(dt_temp: DT_temp, dt_ht: DT_heat_transfer) {
         val difT = dt_temp.body - dt_ht.external_temp + 0.001
         dt_ht.h_body_air = 2.1 + 1.2834 * log(difT, 2.73) + 1.51 + 4.2 * dt_ht.wind
         dt_ht.h_coil_oil = 0.4019 * dt_temp.oil + 110.09
@@ -82,10 +82,10 @@ fun updateHtParams(dt_temp: DT_temp, dt_ht: DT_heat_transfer) {
  * @param ht - значения коэффциентов теплопередачи
  */
 class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
-    var temp_C = DT_temp(20.0, 20.0, 20.0,20.0)
-    var current_ = 0.0
-    val Q = mutableMapOf<String, Array<Double> >("oil" to Array(2, {0.0}), "coil" to Array(2, {0.0}), "core" to Array(2, {0.0}), "body" to Array(2, {0.0}))
-    val Csb = 5.6e-8
+    internal var temp_C = DT_temp(20.0, 20.0, 20.0,20.0)
+    private var current_ = 0.0
+    private val Q = mutableMapOf<String, Array<Double> >("oil" to Array(2, {0.0}), "coil" to Array(2, {0.0}), "core" to Array(2, {0.0}), "body" to Array(2, {0.0}))
+    private val Csb = 5.6e-8
 
     /**
      * Установить значение тока ДТ
@@ -103,7 +103,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру обмотки
      */
-    fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
+    private fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
         val f1 = type.coil_R*(1+0.004*(coil_temp-293.0))*current().pow(2)
         val f2 = ht.h_coil_oil*type.coil_S*(coil_temp-oil_temp)
@@ -116,7 +116,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру масла
      */
-    fun oil_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
+    private fun oil_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
         val f1 = (ht.h_coil_oil*type.coil_S*(coil_temp - oil_temp) )        //heat transfer from coil to oil
         val f2 = (ht.h_oil_body*type.body_oil_S*(oil_temp - body_temp) )    //heat transfer from oil to body
@@ -130,7 +130,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру сердечника
      */
-    fun core_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
+    private fun core_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
         Q["core"]!![idx] = ht.h_oil_core*type.core_S*(oil_temp - core_temp)
         /*println("HEAT $idx FOR CORE ${Q["core"]?.get(idx)}")*/
@@ -141,7 +141,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param - температуры: обмотки, масла, сердечника, корпуса
      * @return - расчитанную темепартуру корпуса
      */
-    fun body_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
+    private fun body_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
         val f1 = ht.h_body_air*type.body_air_S*(body_temp - ht.external_temp)        //ковекция с корпуса
         val f2 = ht.h_body_ground*type.body_ground_S*(body_temp - ht.external_temp )  //кондукция с корпуса
@@ -158,7 +158,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
       * @param step - шаг расчета
       * @param max_error - разница температур между предыдушим и текущим расчетным шагом, если ошибка меньше данного числа считаем что расчет сошелся
      */
-    fun my_bdf( i_error: CError, step: Double, max_error: Double = 1E-10 )
+    private fun my_bdf( i_error: CError, step: Double, max_error: Double = 1E-10 )
     {
         println("Trace my_bdf**************************************")
         val error = CError(100.0,100.0,100.0,100.0)
@@ -225,7 +225,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      * @param _error - значение ошибки на данном шаге расчета
      * @param _step - временной шаг данного расчета в секундах
      */
-    fun calc_next_step( _error: CError, _step: Double)
+    private fun calc_next_step( _error: CError, _step: Double)
     {
         my_bdf(_error, _step)
         updateHtParams(temp, ht)
@@ -253,9 +253,11 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
             time += step
             calc_next_step( error, step)
             println ("study time: $time, temp_C $temp_C ")
-            writer.append("${temp_C.coil}, ${temp_C.oil}, ${temp_C.core}, ${temp_C.body} \n")
+            if (time % 36  == 0.0 ) {
+                writer.append("${temp_C.coil}, ${temp_C.oil}, ${temp_C.core}, ${temp_C.body} \n")
+            }
             if (error.oil == 0.0 && error.body == 0.0 && error.coil == 0.0 && error.core == 0.0) {
-                step *=1
+                step *=1 //управление шагом - на будущее
             }
 
         }
@@ -269,7 +271,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
  */
 fun dt_ht_create(dt_type: String): DT
 {
-    val temp = DT_temp(293.0, 293.0, 293.0,293.0)
+    val temp = DT_temp(273.0, 273.0, 273.0,273.0)
     val hc = DT_heat_transfer(310.0,310.0,310.0,5.35,8.69,800.0,293.0,0.5,1.0)
     if (0 == dt_type.compareTo("DT-0.6-1000") ){
         val type = DT_type(40.0,390.0,0.0011,0.58,70.0, 480.0, 0.283,24.3, 1670.0, 47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
