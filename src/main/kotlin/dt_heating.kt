@@ -343,3 +343,13 @@ fun set_dt_init_temp_degC(degC: Double, dt: DT)
     dt.temp.body = degK
     updateHtParams(dt.temp, dt.ht)
 }
+
+fun DT.set_dt_init_temp_degC(degC: Double )
+{
+    val degK = degC + 273
+    temp.oil = degK
+    temp.coil = degK
+    temp.core = degK
+    temp.body = degK
+    updateHtParams( temp, ht)
+}
