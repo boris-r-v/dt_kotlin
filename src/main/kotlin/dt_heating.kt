@@ -105,7 +105,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
      */
     private fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
-        val f1 = type.coil_R*(1+0.004*(coil_temp-293.0))*current().pow(2)
+        val f1 = type.coil_R*(1+0.004*(coil_temp-293))*current().pow(2)
         val f2 = ht.h_coil_oil*type.coil_S*(coil_temp-oil_temp)
         Q["coil"]!![idx] = f1 - f2
         //println("HEAT FOR $idx COIL ${Q["coil"]?.get(idx)}")
@@ -334,16 +334,6 @@ fun dt_ht_create(dt_type: String): DT
  * Это значит что обмотка, масло, корпус и сердечник буут иметь указанную температуру
  * Также на эту температуру будут пересчитаны коэффициенты теплопередачи
  */
-fun set_dt_init_temp_degC(degC: Double, dt: DT)
-{
-    val degK = degC + 273
-    dt.temp.oil = degK
-    dt.temp.coil = degK
-    dt.temp.core = degK
-    dt.temp.body = degK
-    updateHtParams(dt.temp, dt.ht)
-}
-
 fun DT.set_dt_init_temp_degC(degC: Double )
 {
     val degK = degC + 273
@@ -353,3 +343,21 @@ fun DT.set_dt_init_temp_degC(degC: Double )
     temp.body = degK
     updateHtParams( temp, ht)
 }
+/**
+ * Устанавливает переденную температуру как начальную температуру ДТ
+ * Это значит что обмотка, масло, корпус и сердечник буут иметь указанную температуру
+ * Также на эту температуру будут пересчитаны коэффициенты теплопередачи
+ */
+fun set_dt_init_temp_degC(degC: Double, dt: DT)
+{
+    dt.set_dt_init_temp_degC(degC)
+    /*
+    val degK = degC + 273
+    dt.temp.oil = degK
+    dt.temp.coil = degK
+    dt.temp.core = degK
+    dt.temp.body = degK
+    updateHtParams(dt.temp, dt.ht)
+    */
+}
+
