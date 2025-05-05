@@ -61,11 +61,6 @@ data class DtTableModel(
     val nominalCurrent: Double
 )
 
-val type = DT_type( 40.0,390.0,0.0011,0.58,
-                    70.0, 480.0, 0.283,
-                    24.3, 1670.0,
-                    47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
-
 fun createTable(connection: Connection) {
     val sql = """
         CREATE TABLE IF NOT EXISTS DTS (
@@ -184,4 +179,33 @@ fun getDT(name: String): DT_type {
         println("SQLite error: ${e.message}")
         throw e
     }
+}
+val type = DT_type( 40.0,390.0,0.0011,0.58,
+    70.0, 480.0, 0.283,
+    24.3, 1670.0,
+    47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+
+fun saveKnownDt(){
+    val dbPath = "sample.db"
+    val url = "jdbc:sqlite:$dbPath"
+
+    try {
+        val connection = DriverManager.getConnection(url)
+        val dt = DtTableModel(
+            name = "DT-0.6-1000",
+            coilM = 40.0,
+            coilR = 0.0011,
+            coilS = 0.58,
+            coreM = 70.0,
+            coreX = TODO(),
+            coreY = TODO(),
+            coreZ = TODO(),
+            oilM = 24.3,
+            bodyM = 47.0,
+            bodyX = 0.67,
+            bodyY = 0.45,
+            bodyZ = 0.38,
+            nominalCurrent = 2000
+        )
+
 }
