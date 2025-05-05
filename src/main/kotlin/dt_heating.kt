@@ -101,7 +101,9 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
     /**
      * Функция дифференциального уравнения теплового баланса обмотки
      * @param - температуры: обмотки, масла, сердечника, корпуса
-     * @return - расчитанную темепартуру обмотки
+     * @return - рассчитанную температуру обмотки
+     * f1 - сколько тепла выделилось в обмотке
+     * f2 - сколько тепла отдали в масло
      */
     private fun coil_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
@@ -114,7 +116,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
     /**
      * Функция дифференциального уравнения теплового баланса масла
      * @param - температуры: обмотки, масла, сердечника, корпуса
-     * @return - расчитанную темепартуру масла
+     * @return - рассчитанную температуру масла
      */
     private fun oil_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
@@ -128,7 +130,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
     /**
      * Функция дифференциального уравнения теплового баланса сердечника
      * @param - температуры: обмотки, масла, сердечника, корпуса
-     * @return - расчитанную темепартуру сердечника
+     * @return - рассчитанную температуру сердечника
      */
     private fun core_ode( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
@@ -139,7 +141,7 @@ class DT(var temp: DT_temp, val type: DT_type, var ht: DT_heat_transfer){
     /**
      * Функция дифференциального уравнения теплового баланса корпуса
      * @param - температуры: обмотки, масла, сердечника, корпуса
-     * @return - расчитанную темепартуру корпуса
+     * @return -рассчитанную температуру корпуса
      */
     private fun body_ode ( coil_temp: Double, oil_temp: Double, core_temp: Double, body_temp:Double, idx: Int = 0 ): Double
     {
