@@ -9,12 +9,12 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Конструкционные параметры ДТ храняться в базе данных и на их основе создаем экземпляры DT_type
+ * Конструкционные параметры ДТ хранятся в базе данных и на их основе создаем экземпляры DT_type
  * Мне надо:
- * 1. Массы масла, обмотки, седрдечника, корпуса
+ * 1. Массы масла, обмотки, сердечника, корпуса
  * 2. Габаритные размеры корпуса и сердечника
  * 3. Площадь сечения токовой обмотки
- * 4. Сопротивление обмотки тяговому току в Омах при 20гр.цельсия
+ * 4. Сопротивление обмотки тяговому току в Омах при 20гр. цельсия
  *
  * Как определить параметры нужные для модели
  *  Масло:
@@ -82,20 +82,20 @@ data class HeatModelConstant(
  * @param dtM масса дроссель-трансформатора без масла, кг
  * @param coilR сопротивление токовой обмотки, Ом
  * @param coilS площадь сечения токовой обмотки, mm2
- * @param coreX ширина сердечника, м
- * @param coreY длинна сердечника, м (coreX*coreY - площадь основания сердечника)
- * @param coreZ высота сердечника, м
- * @param bodyX ширина корпуса, м
- * @param bodyY длинна корпуса, м (bodyX*bodyY - площадь основания корпуса)
- * @param bodyZ высота корпуса, м
+ * @param coreL длинна сердечника, м
+ * @param coreW ширина сердечника, м (coreL*coreW - площадь основания сердечника)
+ * @param coreH высота сердечника, м
+ * @param bodyL длинна корпуса, м
+ * @param bodyW ширина корпуса, м (bodyL*bodyW - площадь основания корпуса)
+ * @param bodyH высота корпуса, м
  *
  * Как посчитать данные для DT_type
- * core_S = 2*(coreX+coreY)*coreZ + coreX*coreY
- * body_old_S = 2*(bodyX+bodyY)*coreZ
- * body_air_S = 2*(bodyX+bodyY)*bodyZ + bodyX*bodyY - нужно перепроверить как это я посчитал с учетом вертикальных стенок и т.д.
- * body_radiation_S = 2*(bodyX+bodyY)*bodyZ + 2*bodyX*bodyY
- * body_ground_S = bodyX*bodyY
- * body_sun_S = 0.5*(bodyX+bodyY)*bodyZ + bodyX*bodyY
+ * core_S = 2*(coreL+coreW)*coreH + coreL*coreW
+ * body_old_S = 2*(bodyL+bodyW)*coreH
+ * body_air_S = 2*(bodyL+bodyW)*bodyH + bodyL*bodyW - нужно перепроверить как это я посчитал с учетом вертикальных стенок и т.д.
+ * body_radiation_S = 2*(bodyL+bodyW)*bodyH + 2*bodyL*bodyW
+ * body_ground_S = bodyL*bodyW
+ * body_sun_S = 0.5*(bodyW+bodyL)*bodyH + bodyL*bodyW
  *
  */
 data class DtTableModel(
@@ -103,8 +103,8 @@ data class DtTableModel(
     val oilV: Double,
     val dtM: Double,
     val coilR: Double, val coilS: Double,
-    val coreX: Double, val coreY: Double, val coreZ: Double,
-    val bodyX: Double, val bodyY: Double, val bodyZ: Double,
+    val coreL: Double, val coreW: Double, val coreH: Double,
+    val bodyL: Double, val bodyW: Double, val bodyH: Double,
     val nominalCurrent: Double
 )
 
@@ -116,13 +116,13 @@ fun createTable(connection: Connection) {
             dtM REAL NOT NULL,
             coilR REAL NOT NULL,         
             coilS REAL NOT NULL,
-            coreX REAL NOT NULL,
-            coreY REAL NOT NULL,
-            coreZ REAL NOT NULL,
-            bodyX REAL NOT NULL,
-            bodyY REAL NOT NULL,
-            bodyZ REAL NOT NULL,
-            numinalCurrent REAL NOT NULL
+            coreL REAL NOT NULL,
+            coreW REAL NOT NULL,
+            coreH REAL NOT NULL,
+            bodyL REAL NOT NULL,
+            bodyW REAL NOT NULL,
+            bodyH REAL NOT NULL,
+            nominalCurrent REAL NOT NULL
         );
     """.trimIndent()
 
@@ -130,7 +130,7 @@ fun createTable(connection: Connection) {
     println("Table DTS created successfully")
 }
 fun insertDT(connection: Connection, dt: DtTableModel) {
-    val sql = "INSERT INTO DTS(name, oilV, dtM, coilR, coilS, coreX, coreY, coreZ, bodyX, bodyY, bodyZ, nominalCurrent ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    val sql = "INSERT INTO DTS(name, oilV, dtM, coilR, coilS, coreL, coreW, coreH, bodyL, bodyW, bodyH, nominalCurrent ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
     connection.prepareStatement(sql).use { pstmt ->
         pstmt.setString(1, dt.name )
@@ -138,12 +138,12 @@ fun insertDT(connection: Connection, dt: DtTableModel) {
         pstmt.setDouble(3, dt.dtM)
         pstmt.setDouble(4, dt.coilR)
         pstmt.setDouble(5, dt.coilS)
-        pstmt.setDouble(6, dt.coreX)
-        pstmt.setDouble(7, dt.coreY)
-        pstmt.setDouble(8, dt.coreZ)
-        pstmt.setDouble(9, dt.bodyX)
-        pstmt.setDouble(10, dt.bodyY)
-        pstmt.setDouble(11, dt.bodyZ)
+        pstmt.setDouble(6, dt.coreL)
+        pstmt.setDouble(7, dt.coreW)
+        pstmt.setDouble(8, dt.coreH)
+        pstmt.setDouble(9, dt.bodyL)
+        pstmt.setDouble(10, dt.bodyW)
+        pstmt.setDouble(11, dt.bodyH)
         pstmt.setDouble(12, dt.nominalCurrent)
         pstmt.executeUpdate()
     }
@@ -165,12 +165,12 @@ fun readDT(connection: Connection, name: String): DtTableModel {
                     dtM = rs.getDouble("dtM"),
                     coilR = rs.getDouble("coilR"),
                     coilS = rs.getDouble("coilS"),
-                    coreX = rs.getDouble("coreX"),
-                    coreY = rs.getDouble("coreY"),
-                    coreZ = rs.getDouble("coreZ"),
-                    bodyX = rs.getDouble("bodyX"),
-                    bodyY = rs.getDouble("bodyY"),
-                    bodyZ = rs.getDouble("bodyZ"),
+                    coreL = rs.getDouble("coreL"),
+                    coreW = rs.getDouble("coreW"),
+                    coreH = rs.getDouble("coreH"),
+                    bodyL = rs.getDouble("bodyL"),
+                    bodyW = rs.getDouble("bodyW"),
+                    bodyH = rs.getDouble("bodyH"),
                     nominalCurrent = rs.getDouble("nominalCurrent")
                 )
             }
@@ -179,25 +179,27 @@ fun readDT(connection: Connection, name: String): DtTableModel {
     }
 }
 
-fun getDT(name: String): DT_type {
-    val dbPath = "sample.db"
-    val url = "jdbc:sqlite:$dbPath"
-
+fun getDT(connection: Connection, name: String): DT_type {
     try {
-        val connection = DriverManager.getConnection(url)
         val dtData = readDT(connection, name)
-        val dtConstant: HeatModelConstant = HeatModelConstant()
+        val dtConstant = HeatModelConstant()
         //Расчет параметров токовой обмотки ДТ
-        val coilLen: Double = dtData.coilR*dtData.coilS/dtConstant.coilRo   //расчетная длина обмотки
-        val coilEqvRadius: Double = sqrt(dtData.coilS/PI)               //радиус круга эквивалентной площади
-        val coilEqvC: Double = 2*PI*coilEqvRadius                           //длина окружности эквалентного цилинда
-        val coilM: Double = dtData.coilS*coilLen*dtConstant.coilDens        //масса обмотки
+        val coilLen: Double = dtData.coilR*dtData.coilS*0.000001/dtConstant.coilRo   //расчетная длина обмотки,м
+        val coilEqvRadius: Double = sqrt(dtData.coilS/PI)               //радиус круга эквивалентной площади, м
+        val coilEqvC: Double = 2*PI*coilEqvRadius                           //длина окружности эквалентного цилинда, м
+        val coilV: Double = dtData.coilS*coilLen*0.000001                   //объем обмотки, м3
+        val coilM: Double = coilV*dtConstant.coilDens                       //масса обмотки
         val oilM: Double = dtData.oilV*0.001*dtConstant.oilDens             //масса масла
-        val bodyV1: Double = dtData.bodyX * dtData.bodyY * dtData.coreZ
-        val bodyV2: Double = (dtData.bodyX-dtConstant.bodyWallThickness) * (dtData.bodyY-dtConstant.bodyWallThickness) * (dtData.coreZ-dtConstant.bodyWallThickness)
+        val bodyV1: Double = dtData.bodyL * dtData.bodyW * dtData.coreH
+        val bodyV2: Double = (dtData.bodyL-dtConstant.bodyWallThickness) * (dtData.bodyW-dtConstant.bodyWallThickness) * (dtData.coreH-dtConstant.bodyWallThickness)
         val bodyM: Double = abs(bodyV1-bodyV2)*dtConstant.bodyMassCoefficient*dtConstant.bodyDens   //масса корпуса
-        val coreM: Double = dtData.dtM - (coilM+bodyM)
+        val coreM: Double = dtData.dtM - (coilM+bodyM)                      //масса сердечника
         assert(coreM < 0) { "Масса сердечника ДТ получилась меньше нуля, массаДТ-(массаОбмотки+массаКорпуса) ${dtData.dtM} - ($coilM + $bodyM)" }
+        println("=================$name")
+        //println("coilLen<$coilLen>м, coilEqvRadius<$coilEqvRadius>м, coilEqvC<$coilEqvC>м, coilV<$coilV>м^3")
+        //println("bodyV1<$bodyV1>, bodyV2<$bodyV2>")
+        println("coilM<$coilM>, oilM<$oilM>, bodyM<$bodyM>, coreM<$coreM>")
+        //println("=====================================================")
         return DT_type(
             name = dtData.name,
             coil_M = coilM,
@@ -212,12 +214,12 @@ fun getDT(name: String): DT_type {
             core_HC = dtConstant.coreHC,
             body_HC = dtConstant.bodyHC,
             body_grayness = dtConstant.bodyGrayness,
-            core_S = 2*(dtData.coreX+dtData.coreY)*dtData.coreZ + dtData.coreX*dtData.coreY,
-            body_oil_S = 2*(dtData.bodyX+dtData.bodyY)*dtData.coreZ,
-            body_air_S =  1.5*(dtData.bodyX+dtData.bodyY)*dtData.bodyZ + dtData.bodyX*dtData.bodyY,
-            body_radiation_S = 2*(dtData.bodyX+dtData.bodyY)*dtData.bodyZ + 2*dtData.bodyX*dtData.bodyY,
-            body_ground_S = dtData.bodyX*dtData.bodyY,
-            body_sun_S = 0.5*(dtData.bodyX+dtData.bodyY)*dtData.bodyZ + dtData.bodyX*dtData.bodyY
+            core_S = 2*(dtData.coreL+dtData.coreW)*dtData.coreH + dtData.coreL*dtData.coreW,
+            body_oil_S = 2*(dtData.bodyL+dtData.bodyW)*dtData.coreH,
+            body_air_S =  1.5*(dtData.bodyL+dtData.bodyW)*dtData.bodyH + dtData.bodyL*dtData.bodyW,
+            body_radiation_S = 2*(dtData.bodyL+dtData.bodyW)*dtData.bodyH + 2*dtData.bodyL*dtData.bodyW,
+            body_ground_S = dtData.bodyL*dtData.bodyW,
+            body_sun_S = 0.5*(dtData.bodyL+dtData.bodyW)*dtData.bodyH + dtData.bodyL*dtData.bodyW
         )
 
     }
@@ -231,33 +233,112 @@ fun getDT(name: String): DT_type {
         throw e
     }
 }
-val type = DT_type( 40.0,390.0,0.0011,0.58,
+/*val type = DT_type( 40.0,390.0,0.0011,0.58,
     70.0, 480.0, 0.283,
     24.3, 1670.0,
     47.0, 480.0, 0.76,0.3,1.3,0.86, 0.258,0.9,2000.0, "DT-0.6-1000")
+*/
 
-fun saveKnownDt(){
-    val dbPath = "sample.db"
+fun saveKnownDt(connection: Connection ){
+    val dt061000 = DtTableModel(
+        name = "DT-0.6-1000",
+        oilV = 28.0,
+        dtM = 157.0,
+        coilR = 0.001,
+        coilS = 249.04,
+        coreL = 0.1206,
+        coreW = 0.1582,
+        coreH = 0.3014,
+        bodyL = 0.8,    //Длина
+        bodyW = 0.5,    //Ширина
+        bodyH = 0.38,   //Высота
+        nominalCurrent = 2000.0
+    )
+    val dt06500 = DtTableModel(
+        name = "DT-0.6-500",
+        oilV = 19.0,
+        dtM = 115.0,
+        coilR = 0.0022,
+        coilS = 100.0,
+        coreL = 0.1206,
+        coreW = 0.1582,
+        coreH = 0.3014,
+        bodyL = 0.8,
+        bodyW = 0.5,
+        bodyH = 0.38,
+        nominalCurrent = 1000.0
+    )
+    val dt021000 = DtTableModel(
+        name = "DT-0.2-1000",
+        oilV = 27.0,
+        dtM = 157.0,
+        coilR = 0.0008,
+        coilS = 226.4,
+        coreL = 0.1206,
+        coreW = 0.1582,
+        coreH = 0.3014,
+        bodyL = 0.67,    //Длина
+        bodyW = 0.45,    //Ширина
+        bodyH = 0.38,   //Высота
+        nominalCurrent = 2000.0
+    )
+    val dt02500 = DtTableModel(
+        name = "DT-0.2-500",
+        oilV = 18.0,
+        dtM = 115.0,
+        coilR = 0.0013,
+        coilS = 100.0,
+        coreL = 0.1206,
+        coreW = 0.1582,
+        coreH = 0.3014,
+        bodyL = 0.67,    //Длина
+        bodyW = 0.45,    //Ширина
+        bodyH = 0.38,   //Высота
+        nominalCurrent = 1000.0
+    )
+    try {
+        insertDT(connection, dt061000)
+    }
+    catch (e: Exception){
+        println("Ошибка вставки ${dt061000.name} ->  ${e.message}")
+    }
+    try {
+        insertDT(connection, dt021000)
+    }
+    catch (e: Exception){
+        println("Ошибка вставки ${dt021000.name} ->  ${e.message}")
+    }
+    try {
+        insertDT(connection, dt06500)
+
+    }
+    catch (e: Exception){
+        println("Ошибка вставки ${dt06500.name} ->  ${e.message}")
+    }
+    try {
+        insertDT(connection, dt02500)
+    }
+    catch (e: Exception){
+        println("Ошибка вставки ${dt02500.name} ->  ${e.message}")
+    }
+
+}
+
+fun main() {
+    val dbPath = "dt_sample.db"
     val url = "jdbc:sqlite:$dbPath"
 
     try {
         val connection = DriverManager.getConnection(url)
-        val dt = DtTableModel(
-            name = "DT-0.6-1000",
-            oilV = 28.0,
-            dtM = 157.0,
-            coilR = 0.0011,
-            coilS = 243.1,
-            coreX = TODO(),
-            coreY = TODO(),
-            coreZ = TODO(),
-            bodyX = 0.67,
-            bodyY = 0.45,
-            bodyZ = 0.38,
-            nominalCurrent = 2000.0
-        )
-    }
-    catch (e: Exception){
+        createTable(connection)
+        saveKnownDt(connection)
+
+        getDT(connection, "DT-0.2-500")
+        getDT(connection, "DT-0.2-1000")
+        getDT(connection, "DT-0.6-500")
+        getDT(connection, "DT-0.6-1000")
+
+    } catch (e: Exception) {
         println("Ошибка: ${e.message}")
     }
 }
