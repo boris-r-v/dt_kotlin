@@ -193,10 +193,10 @@ fun getDT(connection: Connection, name: String): DT_type {
         val bodyV1: Double = dtData.bodyL * dtData.bodyW * dtData.coreH
         val bodyV2: Double = (dtData.bodyL-dtConstant.bodyWallThickness) * (dtData.bodyW-dtConstant.bodyWallThickness) * (dtData.coreH-dtConstant.bodyWallThickness)
         val bodyM: Double = abs(bodyV1-bodyV2)*dtConstant.bodyMassCoefficient*dtConstant.bodyDens   //масса корпуса
-        val coreM: Double = dtData.dtM - (coilM+bodyM)                      //масса сердечника
+        val coreM: Double = dtData.dtM - (coilM+bodyM+oilM)                      //масса сердечника
         assert(coreM < 0) { "Масса сердечника ДТ получилась меньше нуля, массаДТ-(массаОбмотки+массаКорпуса) ${dtData.dtM} - ($coilM + $bodyM)" }
         println("=================$name")
-        //println("coilLen<$coilLen>м, coilEqvRadius<$coilEqvRadius>м, coilEqvC<$coilEqvC>м, coilV<$coilV>м^3")
+        println("coilLen<$coilLen>м, coilEqvRadius<$coilEqvRadius>м, coilEqvC<$coilEqvC>м, coilV<$coilV>м^3")
         //println("bodyV1<$bodyV1>, bodyV2<$bodyV2>")
         println("coilM<$coilM>, oilM<$oilM>, bodyM<$bodyM>, coreM<$coreM>")
         //println("=====================================================")
@@ -244,8 +244,8 @@ fun saveKnownDt(connection: Connection ){
         name = "DT-0.6-1000",
         oilV = 28.0,
         dtM = 157.0,
-        coilR = 0.001,
-        coilS = 249.04,
+        coilR = 0.0011,
+        coilS = 243.0,
         coreL = 0.1206,
         coreW = 0.1582,
         coreH = 0.3014,
@@ -273,7 +273,7 @@ fun saveKnownDt(connection: Connection ){
         oilV = 27.0,
         dtM = 157.0,
         coilR = 0.0008,
-        coilS = 226.4,
+        coilS = 221.0,
         coreL = 0.1206,
         coreW = 0.1582,
         coreH = 0.3014,
